@@ -1,0 +1,669 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OSINT Triage Tool</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.x/dist/tabler-icons.min.css">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #ffffff;
+    --bg2: #f5f5f4;
+    --bg3: #eeede9;
+    --text: #1a1a18;
+    --text2: #5a5a56;
+    --text3: #9a9a94;
+    --border: rgba(0,0,0,0.12);
+    --border2: rgba(0,0,0,0.22);
+    --accent: #185FA5;
+    --radius: 8px;
+    --radius-lg: 12px;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1c1c1a;
+      --bg2: #252523;
+      --bg3: #2e2e2b;
+      --text: #f0efe8;
+      --text2: #a8a8a0;
+      --text3: #68685f;
+      --border: rgba(255,255,255,0.10);
+      --border2: rgba(255,255,255,0.20);
+      --accent: #5BA3E0;
+    }
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    background: var(--bg2);
+    color: var(--text);
+    font-size: 14px;
+    min-height: 100vh;
+  }
+
+  header {
+    background: var(--bg);
+    border-bottom: 0.5px solid var(--border);
+    padding: 16px 24px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+
+  header h1 {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text);
+    letter-spacing: -0.01em;
+  }
+
+  header .subtitle {
+    font-size: 12px;
+    color: var(--text3);
+    margin-left: 4px;
+  }
+
+  .icon-wrap {
+    width: 28px; height: 28px;
+    background: #185FA5;
+    border-radius: 7px;
+    display: flex; align-items: center; justify-content: center;
+    color: #fff;
+    font-size: 15px;
+    flex-shrink: 0;
+  }
+
+  .container {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 24px 20px;
+  }
+
+  .tabs {
+    display: flex;
+    gap: 0;
+    margin-bottom: 20px;
+    background: var(--bg3);
+    border-radius: var(--radius-lg);
+    padding: 3px;
+    width: fit-content;
+  }
+
+  .tab {
+    font-size: 13px;
+    font-weight: 500;
+    padding: 7px 18px;
+    border: none;
+    background: transparent;
+    color: var(--text2);
+    cursor: pointer;
+    border-radius: 9px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: background 0.15s, color 0.15s;
+  }
+
+  .tab.active {
+    background: var(--bg);
+    color: var(--text);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.10);
+  }
+
+  .panel { display: none; }
+  .panel.active { display: block; }
+
+  .input-card {
+    background: var(--bg);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 16px 18px;
+    margin-bottom: 16px;
+  }
+
+  .lbl {
+    font-size: 12px;
+    color: var(--text2);
+    margin-bottom: 8px;
+    display: block;
+  }
+
+  textarea {
+    width: 100%;
+    resize: vertical;
+    font-family: "SF Mono", "Fira Code", "Menlo", monospace;
+    font-size: 12px;
+    border-radius: var(--radius);
+    border: 0.5px solid var(--border2);
+    padding: 10px 12px;
+    background: var(--bg2);
+    color: var(--text);
+    line-height: 1.6;
+    outline: none;
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+
+  textarea:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(24,95,165,0.12);
+  }
+
+  .type-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 12px;
+    min-height: 26px;
+    flex-wrap: wrap;
+  }
+
+  .badge {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 3px 10px;
+    border-radius: 20px;
+    letter-spacing: 0.01em;
+  }
+
+  .b-ip      { background: #dbeafe; color: #1e40af; }
+  .b-email   { background: #d1fae5; color: #065f46; }
+  .b-header  { background: #fef3c7; color: #92400e; }
+  .b-domain  { background: #ede9fe; color: #4c1d95; }
+  .b-hash    { background: #fee2e2; color: #991b1b; }
+  .b-phone   { background: #dcfce7; color: #166534; }
+  .b-url     { background: #fce7f3; color: #831843; }
+  .b-unknown { background: #f3f4f6; color: #374151; }
+
+  @media (prefers-color-scheme: dark) {
+    .b-ip      { background: #1e3a5f; color: #93c5fd; }
+    .b-email   { background: #064e3b; color: #6ee7b7; }
+    .b-header  { background: #451a03; color: #fcd34d; }
+    .b-domain  { background: #2e1065; color: #c4b5fd; }
+    .b-hash    { background: #450a0a; color: #fca5a5; }
+    .b-phone   { background: #052e16; color: #86efac; }
+    .b-url     { background: #500724; color: #f9a8d4; }
+    .b-unknown { background: #1f2937; color: #d1d5db; }
+  }
+
+  .hint { font-size: 12px; color: var(--text3); }
+
+  .sec-lbl {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text3);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+
+  .card {
+    background: var(--bg);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 13px 15px;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    transition: border-color 0.15s;
+  }
+
+  .card:hover { border-color: var(--border2); }
+
+  .card-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 7px;
+  }
+
+  .card-title i { color: var(--accent); font-size: 15px; }
+
+  .card-desc {
+    font-size: 12px;
+    color: var(--text2);
+    line-height: 1.5;
+    flex: 1;
+  }
+
+  .card-btn {
+    margin-top: 8px;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 12px;
+    font-weight: 500;
+    padding: 6px 12px;
+    border-radius: var(--radius);
+    border: 0.5px solid var(--border2);
+    background: transparent;
+    color: var(--text);
+    cursor: pointer;
+    text-decoration: none;
+    transition: background 0.15s;
+  }
+
+  .card-btn:hover { background: var(--bg2); }
+
+  .card-btn.manual {
+    border-color: #d97706;
+    color: #92400e;
+    background: #fef3c7;
+  }
+
+  .card-btn.manual:hover { background: #fde68a; }
+
+  @media (prefers-color-scheme: dark) {
+    .card-btn.manual {
+      background: #451a03;
+      color: #fcd34d;
+      border-color: #92400e;
+    }
+    .card-btn.manual:hover { background: #78350f; }
+  }
+
+  .manual-note {
+    font-size: 12px;
+    color: var(--text2);
+    background: var(--bg2);
+    border-left: 2px solid #d97706;
+    padding: 8px 12px;
+    border-radius: 0 var(--radius) var(--radius) 0;
+    margin-bottom: 14px;
+    line-height: 1.5;
+  }
+
+  .action-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 4px;
+    flex-wrap: wrap;
+  }
+
+  .action-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    font-weight: 500;
+    padding: 6px 14px;
+    border-radius: var(--radius);
+    border: 0.5px solid var(--border2);
+    background: transparent;
+    color: var(--text);
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+
+  .action-btn:hover { background: var(--bg3); }
+
+  .copied-msg {
+    font-size: 12px;
+    color: #059669;
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+
+  .export-area {
+    display: none;
+    margin-top: 12px;
+  }
+
+  .export-area textarea {
+    min-height: 200px;
+    font-size: 11px;
+    background: var(--bg2);
+  }
+
+  .artifact-row {
+    background: var(--bg);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius);
+    padding: 10px 14px;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  .artifact-val {
+    font-family: "SF Mono", "Fira Code", monospace;
+    font-size: 12px;
+    color: var(--text);
+    flex: 1;
+    min-width: 120px;
+    word-break: break-all;
+  }
+
+  .artifact-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .alink {
+    font-size: 11px;
+    padding: 4px 10px;
+    border-radius: var(--radius);
+    border: 0.5px solid var(--border2);
+    background: transparent;
+    color: var(--text2);
+    text-decoration: none;
+    white-space: nowrap;
+    transition: background 0.15s, color 0.15s;
+  }
+
+  .alink:hover {
+    background: var(--bg2);
+    color: var(--text);
+  }
+
+  .empty {
+    color: var(--text3);
+    font-size: 14px;
+    padding: 1.5rem 0;
+  }
+
+  footer {
+    text-align: center;
+    font-size: 11px;
+    color: var(--text3);
+    padding: 24px 0 32px;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="icon-wrap"><i class="ti ti-shield-search"></i></div>
+  <h1>OSINT Triage Tool</h1>
+  <span class="subtitle">v2.0</span>
+</header>
+
+<div class="container">
+
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('single', this)">
+      <i class="ti ti-search"></i> Single artifact
+    </button>
+    <button class="tab" onclick="switchTab('bulk', this)">
+      <i class="ti ti-file-text"></i> Bulk extract
+    </button>
+  </div>
+
+  <div id="panel-single" class="panel active">
+    <div class="input-card">
+      <label class="lbl">Paste an IP address, email, domain, URL, phone number, file hash, or full email header</label>
+      <textarea id="singleInput" rows="4" placeholder="e.g.  198.51.100.42  ·  user@example.com  ·  +1-919-555-0100  ·  d41d8cd98f00b204e9800998ecf8427e" oninput="analyzeSingle()"></textarea>
+      <div class="type-row" id="typeRow">
+        <span class="hint">Detected type appears here as you type</span>
+      </div>
+    </div>
+    <div id="serviceArea"></div>
+  </div>
+
+  <div id="panel-bulk" class="panel">
+    <div class="input-card">
+      <label class="lbl">Paste any block of text — email body, log file, report, or raw headers. All recognizable artifacts will be extracted and queued for triage.</label>
+      <textarea id="bulkInput" rows="7" placeholder="Paste raw text here — IPs, emails, domains, hashes, and phone numbers will be extracted automatically..."></textarea>
+      <div style="margin-top:12px">
+        <button class="action-btn" onclick="runBulk()"><i class="ti ti-scan"></i> Extract artifacts</button>
+      </div>
+    </div>
+    <div class="bulk-results" id="bulkResults"></div>
+  </div>
+
+</div>
+
+<footer>OSINT Triage Tool · local app · no data leaves your machine except when you click a service link</footer>
+
+<script>
+const SVC = {
+  ip: [
+    { name: 'ip2location', icon: 'ti-map-pin', desc: 'Geolocation, ISP, and proxy/VPN detection.', url: v => `https://www.ip2location.com/demo/${e(v)}` },
+    { name: 'AbuseIPDB', icon: 'ti-shield-x', desc: 'Community abuse reports and confidence score.', url: v => `https://www.abuseipdb.com/check/${e(v)}` },
+    { name: 'Shodan', icon: 'ti-radar', desc: 'Open ports, services, banners, and CVEs on this host.', url: v => `https://www.shodan.io/host/${e(v)}` },
+    { name: 'VirusTotal', icon: 'ti-virus', desc: '70+ vendor reputation check for this IP.', url: v => `https://www.virustotal.com/gui/ip-address/${e(v)}` },
+    { name: 'Talos Intelligence', icon: 'ti-shield-half', desc: 'Cisco threat intel: reputation and email score.', url: v => `https://talosintelligence.com/reputation_center/lookup?search=${e(v)}` },
+    { name: 'ARIN Whois', icon: 'ti-building-bank', desc: 'ASN, netblock, and org ownership.', url: v => `https://search.arin.net/rdap/?query=${e(v)}` },
+    { name: 'whois.com', icon: 'ti-id', desc: 'Whois registration and abuse contact info.', url: v => `https://www.whois.com/whois/${e(v)}` },
+    { name: 'CentralOps', icon: 'ti-terminal', desc: 'DNS, traceroute, and service scan.', url: v => `https://centralops.net/co/DomainDossier.aspx?addr=${e(v)}&dom_whois=true&dom_dns=true&net_whois=true&svc_scan=true` },
+    { name: 'MXToolbox Blacklist', icon: 'ti-list-check', desc: 'RBL check — is this IP on spam or abuse lists?', url: v => `https://mxtoolbox.com/blacklists.aspx?domain=${e(v)}` },
+  ],
+  email: [
+    { name: 'Have I Been Pwned', icon: 'ti-shield-x', desc: 'Check known breach and paste exposure.', url: v => `https://haveibeenpwned.com/account/${e(v)}` },
+    { name: 'ThatsThem', icon: 'ti-user-search', desc: 'Reverse email: linked names, phones, addresses.', url: v => `https://thatsthem.com/reverse-email-lookup/${e(v)}` },
+    { name: 'VirusTotal', icon: 'ti-virus', desc: 'Reputation check on the email domain.', url: v => `https://www.virustotal.com/gui/domain/${e(dom(v))}` },
+    { name: 'MXToolbox Email Health', icon: 'ti-tool', desc: 'MX, SPF, DKIM, and DMARC for the sending domain.', url: v => `https://mxtoolbox.com/emailhealth/${e(dom(v))}` },
+    { name: 'whois.com', icon: 'ti-id', desc: 'Whois on the email domain.', url: v => `https://www.whois.com/whois/${e(dom(v))}` },
+    { name: 'Talos Intelligence', icon: 'ti-shield-half', desc: 'Domain reputation from Cisco threat intel.', url: v => `https://talosintelligence.com/reputation_center/lookup?search=${e(dom(v))}` },
+    { name: 'CentralOps', icon: 'ti-terminal', desc: 'Full domain dossier on the email domain.', url: v => `https://centralops.net/co/DomainDossier.aspx?addr=${e(dom(v))}&dom_whois=true&dom_dns=true&net_whois=true` },
+  ],
+  domain: [
+    { name: 'VirusTotal', icon: 'ti-virus', desc: '70+ vendor reputation for this domain.', url: v => `https://www.virustotal.com/gui/domain/${e(cd(v))}` },
+    { name: 'Shodan', icon: 'ti-radar', desc: 'Infrastructure exposure and open services.', url: v => `https://www.shodan.io/search?query=${e(cd(v))}` },
+    { name: 'Talos Intelligence', icon: 'ti-shield-half', desc: 'Domain reputation and email sender score.', url: v => `https://talosintelligence.com/reputation_center/lookup?search=${e(cd(v))}` },
+    { name: 'whois.com', icon: 'ti-id', desc: 'Registrar, registrant, dates, and nameservers.', url: v => `https://www.whois.com/whois/${e(cd(v))}` },
+    { name: 'ARIN Whois', icon: 'ti-building-bank', desc: 'IP block and ASN behind this domain.', url: v => `https://search.arin.net/rdap/?query=${e(cd(v))}` },
+    { name: 'MXToolbox Email Health', icon: 'ti-tool', desc: 'Mail server health: MX, SPF, DKIM, DMARC.', url: v => `https://mxtoolbox.com/emailhealth/${e(cd(v))}` },
+    { name: 'CentralOps', icon: 'ti-terminal', desc: 'DNS records, traceroute, and service scan.', url: v => `https://centralops.net/co/DomainDossier.aspx?addr=${e(cd(v))}&dom_whois=true&dom_dns=true&net_whois=true&svc_scan=true` },
+    { name: 'ip2location', icon: 'ti-map-pin', desc: 'Resolve domain to IP and check geolocation.', url: v => `https://www.ip2location.com/demo/${e(cd(v))}` },
+  ],
+  url: [
+    { name: 'VirusTotal', icon: 'ti-virus', desc: 'Submit URL to 70+ vendor scanners.', url: v => `https://www.virustotal.com/gui/url/${btoa(v).replace(/=/g, '')}` },
+    { name: 'URLScan.io', icon: 'ti-world-search', desc: 'Sandbox scan: screenshot, DOM, network requests.', url: v => `https://urlscan.io/search/#page.url%3A${e(v)}` },
+    { name: 'Shodan', icon: 'ti-radar', desc: 'Infrastructure behind this URL\'s host.', url: v => `https://www.shodan.io/search?query=${e(cd(v))}` },
+    { name: 'Talos Intelligence', icon: 'ti-shield-half', desc: 'Domain reputation from Cisco.', url: v => `https://talosintelligence.com/reputation_center/lookup?search=${e(cd(v))}` },
+    { name: 'whois.com', icon: 'ti-id', desc: 'Whois on the URL\'s domain.', url: v => `https://www.whois.com/whois/${e(cd(v))}` },
+    { name: 'MXToolbox', icon: 'ti-tool', desc: 'Blacklist and health check on the domain.', url: v => `https://mxtoolbox.com/blacklists.aspx?domain=${e(cd(v))}` },
+  ],
+  hash: [
+    { name: 'VirusTotal', icon: 'ti-virus', desc: 'File hash lookup across 70+ AV vendors.', url: v => `https://www.virustotal.com/gui/file/${e(v.trim())}` },
+    { name: 'MalwareBazaar', icon: 'ti-bug', desc: 'Abuse.ch database of known malware samples.', url: v => `https://bazaar.abuse.ch/browse.php?search=sha256%3A${e(v.trim())}` },
+    { name: 'Talos Intelligence', icon: 'ti-shield-half', desc: 'File reputation check via Cisco.', url: v => `https://talosintelligence.com/talos_file_reputation?disposition=N&sort=&page=1&query=${e(v.trim())}` },
+  ],
+  phone: [
+    { name: 'ThatsThem', icon: 'ti-user-search', desc: 'Reverse phone: linked names and addresses.', url: v => `https://thatsthem.com/phone/${e(v.replace(/\D/g, ''))}` },
+    { name: 'whois.com', icon: 'ti-id', desc: 'General search — may surface registrant phone matches.', url: v => `https://www.whois.com/whois/${e(v.trim())}` },
+  ],
+  header: [
+    { name: 'MXToolbox Header Analyzer', icon: 'ti-mail-opened', desc: 'Hop-by-hop delay, SPF/DKIM result, routing path.', url: null, manual: true, manualUrl: 'https://mxtoolbox.com/Public/Tools/EmailHeaders.aspx' },
+    { name: 'ip2location', icon: 'ti-map-pin', desc: 'Extract IPs from Received: chain, check geolocation.', url: null, manual: true, manualUrl: 'https://www.ip2location.com/demo/' },
+    { name: 'AbuseIPDB', icon: 'ti-shield-x', desc: 'Check extracted IPs for abuse reports.', url: null, manual: true, manualUrl: 'https://www.abuseipdb.com/' },
+    { name: 'ARIN Whois', icon: 'ti-building-bank', desc: 'Netblock lookup on originating IP.', url: null, manual: true, manualUrl: 'https://search.arin.net/rdap/' },
+    { name: 'whois.com', icon: 'ti-id', desc: 'Whois on sender domain from From: or Message-ID.', url: null, manual: true, manualUrl: 'https://www.whois.com/whois/' },
+  ],
+  unknown: [
+    { name: 'whois.com', icon: 'ti-id', desc: 'Try a general Whois lookup.', url: v => `https://www.whois.com/whois/${e(v)}` },
+    { name: 'VirusTotal', icon: 'ti-virus', desc: 'Submit as a general search.', url: v => `https://www.virustotal.com/gui/search/${e(v)}` },
+    { name: 'CentralOps', icon: 'ti-terminal', desc: 'Attempt a domain/IP dossier.', url: v => `https://centralops.net/co/DomainDossier.aspx?addr=${e(v)}&dom_whois=true&dom_dns=true` },
+  ]
+};
+
+const TYPE_META = {
+  ip:      { label: 'IP address',   cls: 'b-ip' },
+  email:   { label: 'Email address', cls: 'b-email' },
+  header:  { label: 'Email header',  cls: 'b-header' },
+  domain:  { label: 'Domain',        cls: 'b-domain' },
+  url:     { label: 'URL',           cls: 'b-url' },
+  hash:    { label: 'File hash',     cls: 'b-hash' },
+  phone:   { label: 'Phone number',  cls: 'b-phone' },
+  unknown: { label: 'Unrecognized',  cls: 'b-unknown' },
+};
+
+function e(v) { return encodeURIComponent(v); }
+function dom(email) { return email.split('@')[1] || email; }
+function cd(v) { return v.replace(/^https?:\/\//, '').split('/')[0]; }
+
+function detect(t) {
+  t = t.trim();
+  if (!t) return null;
+  if (/^(\d{1,3}\.){3}\d{1,3}$/.test(t)) return 'ip';
+  if (/^[0-9a-fA-F]{32}$/.test(t) || /^[0-9a-fA-F]{40}$/.test(t) || /^[0-9a-fA-F]{64}$/.test(t)) return 'hash';
+  if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(t)) return 'email';
+  if (/^https?:\/\//.test(t)) return 'url';
+  if (/^([a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}$/.test(t)) return 'domain';
+  if (/(\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]\d{3}[-.\s]\d{4}/.test(t) && t.replace(/\D/g,'').length >= 10 && t.length < 25) return 'phone';
+  if (t.includes('\n') && (t.toLowerCase().includes('received:') || t.toLowerCase().includes('dkim-signature') || t.toLowerCase().includes('message-id:'))) return 'header';
+  return 'unknown';
+}
+
+function analyzeSingle() {
+  const raw = document.getElementById('singleInput').value;
+  const type = detect(raw);
+  const tr = document.getElementById('typeRow');
+  const area = document.getElementById('serviceArea');
+  if (!raw.trim()) {
+    tr.innerHTML = '<span class="hint">Detected type appears here as you type</span>';
+    area.innerHTML = '';
+    return;
+  }
+  const meta = TYPE_META[type] || TYPE_META.unknown;
+  tr.innerHTML = `<span class="badge ${meta.cls}">${meta.label}</span>`;
+  renderServices(area, type, raw.trim());
+}
+
+function renderServices(area, type, val) {
+  const list = SVC[type] || SVC.unknown;
+  const hasManual = list.some(s => s.manual);
+  let h = `<p class="sec-lbl">Recommended services</p><div class="grid">`;
+  for (const s of list) {
+    const btn = s.manual
+      ? `<a class="card-btn manual" href="${s.manualUrl}" target="_blank" rel="noopener"><i class="ti ti-external-link"></i> Open — paste manually</a>`
+      : `<a class="card-btn" href="${s.url(val)}" target="_blank" rel="noopener"><i class="ti ti-external-link"></i> Open with data</a>`;
+    h += `<div class="card"><div class="card-title"><i class="ti ${s.icon}"></i>${s.name}</div><div class="card-desc">${s.desc}</div>${btn}</div>`;
+  }
+  h += '</div>';
+  if (hasManual) h += `<div class="manual-note"><strong>Manual paste required</strong> for highlighted services — the link opens the tool; paste your data into the form on that page.</div>`;
+  h += `<div class="action-row">
+    <button class="action-btn" onclick="toggleExport(this,'${esc(val)}','${type}')"><i class="ti ti-markdown"></i> Export triage note</button>
+    <span class="copied-msg" id="copiedMsg"></span>
+  </div>
+  <div class="export-area" id="exportArea">
+    <textarea id="exportText" readonly style="margin-top:10px"></textarea>
+    <div class="action-row" style="margin-top:8px">
+      <button class="action-btn" onclick="copyExport()"><i class="ti ti-copy"></i> Copy to clipboard</button>
+    </div>
+  </div>`;
+  area.innerHTML = h;
+}
+
+function esc(s) { return s.replace(/'/g, "\\'").replace(/"/g, '&quot;'); }
+function escHTML(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function toggleExport(btn, val, type) {
+  const ea = document.getElementById('exportArea');
+  if (ea.style.display === 'block') { ea.style.display = 'none'; return; }
+  ea.style.display = 'block';
+  document.getElementById('exportText').value = buildMarkdown(val, type);
+}
+
+function buildMarkdown(val, type) {
+  const now = new Date().toISOString().replace('T', ' ').split('.')[0] + ' UTC';
+  const list = SVC[type] || SVC.unknown;
+  let md = `# OSINT Triage Note\n\n`;
+  md += `**Artifact:** \`${val}\`\n`;
+  md += `**Type:** ${(TYPE_META[type] || TYPE_META.unknown).label}\n`;
+  md += `**Timestamp:** ${now}\n\n`;
+  md += `## Service Links\n\n`;
+  for (const s of list) {
+    const url = s.manual ? s.manualUrl : (s.url ? s.url(val) : 'N/A');
+    md += `- **${s.name}**: ${url}${s.manual ? ' *(manual paste required)*' : ''}\n`;
+  }
+  md += `\n## Analyst Notes\n\n_Add findings here._\n`;
+  return md;
+}
+
+function copyExport() {
+  const t = document.getElementById('exportText');
+  navigator.clipboard.writeText(t.value).then(() => {
+    const msg = document.getElementById('copiedMsg');
+    msg.textContent = 'Copied!';
+    msg.style.opacity = '1';
+    setTimeout(() => { msg.style.opacity = '0'; }, 2000);
+  });
+}
+
+function runBulk() {
+  const raw = document.getElementById('bulkInput').value;
+  const res = document.getElementById('bulkResults');
+  if (!raw.trim()) { res.innerHTML = '<p class="empty">Paste some text above first.</p>'; return; }
+  const found = extractAll(raw);
+  if (!found.length) { res.innerHTML = '<p class="empty">No recognizable artifacts found in the pasted text.</p>'; return; }
+  let h = `<p class="sec-lbl" style="margin-bottom:12px">${found.length} artifact${found.length > 1 ? 's' : ''} found</p>`;
+  for (const f of found) {
+    const list = (SVC[f.type] || SVC.unknown).filter(s => !s.manual);
+    const links = list.slice(0, 4).map(s => `<a class="alink" href="${s.url(f.val)}" target="_blank" rel="noopener">${s.name}</a>`).join('');
+    const meta = TYPE_META[f.type] || TYPE_META.unknown;
+    h += `<div class="artifact-row"><span class="badge ${meta.cls}" style="flex-shrink:0">${meta.label}</span><span class="artifact-val">${escHTML(f.val)}</span><div class="artifact-links">${links}</div></div>`;
+  }
+  h += `<div class="action-row" style="margin-top:14px">
+    <button class="action-btn" onclick="bulkExport()"><i class="ti ti-markdown"></i> Export all as markdown</button>
+  </div>
+  <div class="export-area" id="bulkExportArea" style="margin-top:10px">
+    <textarea id="bulkExportText" readonly></textarea>
+    <div class="action-row" style="margin-top:8px">
+      <button class="action-btn" onclick="copyBulkExport()"><i class="ti ti-copy"></i> Copy to clipboard</button>
+    </div>
+  </div>`;
+  res.innerHTML = h;
+  res._found = found;
+}
+
+function extractAll(text) {
+  const found = []; const seen = new Set();
+  function add(val, type) { const k = val.toLowerCase(); if (!seen.has(k)) { seen.add(k); found.push({ val, type }); } }
+  (text.match(/\b(\d{1,3}\.){3}\d{1,3}\b/g) || []).forEach(v => add(v, 'ip'));
+  (text.match(/[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/g) || []).forEach(v => add(v, 'email'));
+  (text.match(/https?:\/\/[^\s"'>]+/g) || []).forEach(v => add(v, 'url'));
+  (text.match(/\b[0-9a-fA-F]{64}\b|\b[0-9a-fA-F]{40}\b|\b[0-9a-fA-F]{32}\b/g) || []).forEach(v => add(v, 'hash'));
+  (text.match(/(\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]\d{3}[-.\s]\d{4}/g) || []).forEach(v => add(v.trim(), 'phone'));
+  (text.match(/\b(?!(?:\d{1,3}\.){3}\d{1,3}\b)([a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}\b/g) || []).forEach(v => { if (!seen.has(v.toLowerCase())) add(v, 'domain'); });
+  return found;
+}
+
+function bulkExport() {
+  const area = document.getElementById('bulkExportArea');
+  area.style.display = 'block';
+  const found = document.getElementById('bulkResults')._found || [];
+  const now = new Date().toISOString().replace('T', ' ').split('.')[0] + ' UTC';
+  let md = `# OSINT Bulk Triage Report\n\n**Timestamp:** ${now}\n**Artifacts found:** ${found.length}\n\n---\n\n`;
+  for (const f of found) {
+    md += `## ${(TYPE_META[f.type] || TYPE_META.unknown).label}: \`${f.val}\`\n\n`;
+    const list = (SVC[f.type] || SVC.unknown).filter(s => !s.manual);
+    for (const s of list) md += `- **${s.name}**: ${s.url(f.val)}\n`;
+    md += `\n**Analyst notes:** _\n\n---\n\n`;
+  }
+  document.getElementById('bulkExportText').value = md;
+}
+
+function copyBulkExport() {
+  const t = document.getElementById('bulkExportText');
+  navigator.clipboard.writeText(t.value).then(() => { alert('Copied to clipboard'); });
+}
+
+function switchTab(name, btn) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('panel-' + name).classList.add('active');
+  btn.classList.add('active');
+}
+</script>
+</body>
+</html>
